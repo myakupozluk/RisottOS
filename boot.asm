@@ -8,7 +8,10 @@ bits 16
 
 start:
     mov [bootdisk], dl    ; BIOS stores boot drive number in dl, save it
-                             ; before we overwrite dl later
+                            ; before we overwrite dl later
+
+    mov ax, 0x2401          ; enable A20 line so we can access memory
+    int 0x15                  ; above 1MB (needed later for kernel growth)
 
     mov si, bootmsg
     call print              ; print boot message
@@ -51,6 +54,45 @@ disk_error:
     mov si, disk_error_msg
     call print
     jmp $                    ; halt forever
+
+; ============================================
+; GDT (Global Descriptor Table)
+;
+; Purpose: Protected mode no longer uses segment:offset math like real
+; mode did. Instead, segment registers become indexes into this table,
+; which tells the CPU where each segment starts, how big it is, and
+; what it's allowed to do (executable, writable, etc).
+;
+; We use a "flat model": both segments start at 0 and cover the full
+; 4GB address space, so in practice segmentation doesn't restrict us
+; and we rely on paging later instead.
+; ============================================
+gdt_start:
+    dq 0                      ; null descriptor - required by the CPU, unused
+
+gdt_code:                     ; code segment descriptor
+    dw 0xFFFF                  ; limit (bits 0-15) - segment size
+    dw 0x0000                   ; base (bits 0-15) - segment starts at 0
+    db 0x00                      ; base (bits 16-23)
+    db 10011010b                  ; access byte: present, ring 0, code, readable
+    db 11001111b                   ; flags (4KB granularity, 32-bit) + limit (16-19)
+    db 0x00                          ; base (bits 24-31)
+
+gdt_data:                     ; data segment descriptor
+    dw 0xFFFF                  ; limit (bits 0-15)
+    dw 0x0000                   ; base (bits 0-15)
+    db 0x00                      ; base (bits 16-23)
+    db 10010010b                  ; access byte: present, ring 0, data, writable
+    db 11001111b                   ; flags (4KB granularity, 32-bit) + limit (16-19)
+    db 0x00                          ; base (bits 24-31)
+
+gdt_end:
+
+; This structure tells the CPU where the GDT is and how big it is.
+; The lgdt instruction (next step) will load this into the CPU.
+gdt_descriptor:
+    dw gdt_end - gdt_start - 1    ; size of GDT minus 1 (CPU convention)
+    dd gdt_start                    ; address of the GDT itself
 
 ; ============================================
 ; Data
