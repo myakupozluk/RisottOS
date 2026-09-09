@@ -27,7 +27,17 @@ start:
     int 0x13
     jc disk_error                ; carry flag set = read failed
 
-    jmp 0x1000                    ; jump to loaded kernel
+    cli                             ; turning interrupts off temporarily
+    lgdt [gdt_descriptor]            ; loading GDT
+
+    mov eax, cr0                      ; cr0 can't be written directly,
+    or eax, 1                          ; must go through a register
+    mov cr0, eax                        ; set bit 0 -> enable protected mode
+
+    jmp 0x08:protected_mode_start        ; far jump: flush pipeline,
+                                            ; load code segment 0x08 (gdt_code)
+
+    
 
 ; ============================================
 ; print - prints a null-terminated string
@@ -76,7 +86,7 @@ gdt_code:                     ; code segment descriptor
     db 0x00                      ; base (bits 16-23)
     db 10011010b                  ; access byte: present, ring 0, code, readable
     db 11001111b                   ; flags (4KB granularity, 32-bit) + limit (16-19)
-    db 0x00                          ; base (bits 24-31)
+    db 0x00                          ; base (bits 24-31)    
 
 gdt_data:                     ; data segment descriptor
     dw 0xFFFF                  ; limit (bits 0-15)
@@ -94,12 +104,29 @@ gdt_descriptor:
     dw gdt_end - gdt_start - 1    ; size of GDT minus 1 (CPU convention)
     dd gdt_start                    ; address of the GDT itself
 
+
+[bits 32]
+protected_mode_start:
+    mov ax, 0x10          ; gdt_data selector
+    mov ds, ax               ; point data segments to it
+    mov es, ax
+    mov ss, ax
+
+    mov esp, 0x90000          ; set up a fresh 32-bit stack
+
+    mov byte [0xB8780], 'P'      ; write near middle of screen instead of top-left
+    mov byte [0xB8782], 'M'
+
+    jmp 0x1000                      ; placeholder, kernel jump comes here later
+
+    
+
 ; ============================================
 ; Data
 ; ============================================
-bootmsg:         db "Booting RisottOS...", 0
+bootmsg:         db 13, 10, "Booting RisottOS...", 13, 10, 0
 bootdisk:         db 0
-disk_error_msg: db "Disk read failed!", 0
+disk_error_msg: db "Disk read failed!", 13, 10, 0
 
 ; ============================================
 ; Padding + boot signature
