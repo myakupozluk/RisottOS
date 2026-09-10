@@ -1,4 +1,3 @@
-*.img
-*.bin
-*.o
-git.sh
+build/*
+!build/.gitkeep
+scripts/git.sh
