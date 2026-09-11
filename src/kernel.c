@@ -20,9 +20,6 @@ void kmain() {
     sleep_ticks(100);
     print_string("\nRisottOS> ", 0x0F);
 
-    // Main kernel loop driving the shell input handler
-    while (1) {
-        char c = keyboard_read();
-        start_shell(c);        
-    }
+    // The shell owns the input loop.
+    start_shell();
 }
