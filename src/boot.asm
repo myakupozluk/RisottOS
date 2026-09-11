@@ -18,7 +18,7 @@ start:
 
     ; --- Read kernel from disk (CHS addressing) ---
     mov ah, 0x02             ; BIOS function: read sectors
-    mov al, 4                 ; number of sectors to read (leave room for kernel growth)
+    mov al, 8                 ; number of kernel sectors to read
     mov ch, 0                  ; cylinder 0
     mov cl, 2                  ; sector 2 (sector 1 is this bootloader)
     mov dh, 0                  ; head 0
