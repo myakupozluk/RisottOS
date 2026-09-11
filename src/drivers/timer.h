@@ -3,6 +3,6 @@
 
 void timer_init (unsigned int freq);
 void sleep_ticks(unsigned int ticks);
-extern unsigned int tick_count;
+extern volatile unsigned int tick_count;
 
 #endif
