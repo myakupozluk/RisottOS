@@ -18,7 +18,6 @@ void kmain() {
     // Boot message and initial prompt
     print_string("RisottOS booted succesfully!\n", 0x0F);
     sleep_ticks(100);
-    print_string("\nRisottOS> ", 0x0F);
 
     // The shell owns the input loop.
     start_shell();
