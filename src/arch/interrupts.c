@@ -6,6 +6,8 @@ unsigned int tick_count = 0;
 void keyboard_handler(void) {
 	// Forward the IRQ to the keyboard driver.
 	keyboard_irq_handler();
+
+    pic_send_eoi(1);
 }
 
 void timer_handler(void) {

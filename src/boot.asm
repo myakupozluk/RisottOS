@@ -7,36 +7,41 @@
 bits 16
 
 start:
-    mov [bootdisk], dl    ; BIOS stores boot drive number in dl, save it
-                            ; before we overwrite dl later
+    xor ax, ax
+    mov ds, ax
+    mov es, ax
 
-    mov ax, 0x2401          ; enable A20 line so we can access memory
-    int 0x15                  ; above 1MB (needed later for kernel growth)
+    mov [bootdisk], dl
+
+    mov ax, 0x2401
+    int 0x15
 
     mov si, bootmsg
-    call print              ; print boot message
+    call print
 
-    ; --- Read kernel from disk (CHS addressing) ---
-    mov ah, 0x02             ; BIOS function: read sectors
-    mov al, 8                 ; number of kernel sectors to read
-    mov ch, 0                  ; cylinder 0
-    mov cl, 2                  ; sector 2 (sector 1 is this bootloader)
-    mov dh, 0                  ; head 0
-    mov dl, [bootdisk]         ; drive to read from
-    mov bx, 0x1000              ; load kernel to address 0x1000
+    mov si, dap
+    mov ah, 0x42
+    mov dl, [bootdisk]
     int 0x13
-    jc disk_error                ; carry flag set = read failed
+    jc disk_error
 
-    cli                             ; turning interrupts off temporarily
-    lgdt [gdt_descriptor]            ; loading GDT
+    cli
+    lgdt [gdt_descriptor]
 
-    mov eax, cr0                      ; cr0 can't be written directly,
-    or eax, 1                          ; must go through a register
-    mov cr0, eax                        ; set bit 0 -> enable protected mode
+    mov eax, cr0
+    or eax, 1
+    mov cr0, eax
 
-    jmp 0x08:protected_mode_start        ; far jump: flush pipeline,
-                                            ; load code segment 0x08 (gdt_code)
+    jmp 0x08:protected_mode_start
 
+dap:
+    db 0x10
+    db 0
+    dw 16
+    dw 0x1000
+    dw 0x0000
+    dd 1
+    dd 0
     
 
 ; ============================================
