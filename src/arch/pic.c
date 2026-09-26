@@ -26,7 +26,7 @@ void pic_remap (void) {
 
 // Send End-of-Interrupt (EOI) signal to acknowledge handled hardware interrupts
 void pic_send_eoi(unsigned char irq) {
-    // Acknowledge slave PIC if the interrupt urik osirik originated from it
+    // Acknowledge slave PIC if the interrupt originated from it
     if (irq >= 8) {
         outb(0xA0, 0x20);
     }
