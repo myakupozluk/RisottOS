@@ -5,7 +5,7 @@
 #include "arch/io.h"
 #include "arch/shell.h"
 #include "drivers/timer.h"
-
+// urdik
 // Kernel entry point
 void kmain() {
     // Initialize core hardware components
