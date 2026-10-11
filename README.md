@@ -129,6 +129,11 @@ CMakeLists.txt
 
 RisottOS is an educational project and is still under active development. The bootloader uses BIOS extended (LBA) disk reads rather than CHS addressing, avoiding the geometry limitations of older BIOS calls. There is currently no filesystem; the kernel is loaded as a flat binary directly from fixed disk sectors.
 
+## Core Team
+
+*   **[Risotto](https://github.com/myakupozluk)** - Lead Developer / Owner
+*   **[Dev10n](https://github.com/dev10n)** - Core Maintainer / Owner
+
 ## License
 
 See [LICENSE](LICENSE) for license information.
