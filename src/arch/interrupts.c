@@ -1,4 +1,5 @@
 #include "../drivers/keyboard.h"
+#include "../drivers/ata.h"
 #include "pic.h"
 
 unsigned int tick_count = 0;
@@ -14,4 +15,8 @@ void timer_handler(void) {
     tick_count++;
 
     pic_send_eoi(0);
+}
+void ata_handler(void){
+    ata_irq_handler();
+    pic_send_eoi(14);
 }

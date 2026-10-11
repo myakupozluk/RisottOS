@@ -1,7 +1,7 @@
 #include "idt.h"
 extern void interrupt_handler(void);
 extern void timer_interrupt_handler(void);
-
+extern void ata_interrupt_handler(void);
 struct idt_entry
 {
     // Split the 32-bit handler address into two parts.
@@ -35,7 +35,7 @@ void idt_init (void) {
     }
     idt_set_gate(0x21, (unsigned int)interrupt_handler);
     idt_set_gate(0x20, (unsigned int)timer_interrupt_handler);
-
+    idt_set_gate(0x2E, (unsigned int)ata_interrupt_handler);
     // Load the IDT address and size into the CPU.
     idtr.limit = sizeof(idt) - 1;
     idtr.base = (unsigned int)idt;

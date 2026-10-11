@@ -20,8 +20,8 @@ void pic_remap (void) {
     outb(0xA1, 0x01);
 
     // Configure interrupt masks: Unmask timer (IRQ0) and keyboard (IRQ1)
-    outb(0x21, 0xFC);
-    outb(0xA1, 0xFF);
+    outb(0x21, 0xF8);
+    outb(0xA1, 0xBF);
 }
 
 // Send End-of-Interrupt (EOI) signal to acknowledge handled hardware interrupts

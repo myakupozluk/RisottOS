@@ -2,6 +2,8 @@
 
 global interrupt_handler
 global timer_interrupt_handler
+global ata_interrupt_handler
+extern ata_handler
 extern keyboard_handler
 extern timer_handler
 
@@ -16,5 +18,10 @@ timer_interrupt_handler:
     ; Save registers for timer IRQ
     pusha
     call timer_handler
+    popa
+    iretd
+ata_interrupt_handler:
+    pusha
+    call ata_handler
     popa
     iretd

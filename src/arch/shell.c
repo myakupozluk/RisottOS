@@ -2,6 +2,7 @@
 #include "../drivers/vga.h"
 #include "../drivers/keyboard.h"
 #include "../drivers/rtc.h"
+#include "../drivers/ata.h"
 #include "io.h"
 #include "../drivers/timer.h"
 
@@ -41,6 +42,10 @@ static int simple_atoi(const char *str) {
 static char buffer[256];
 static int index = 0;
 
+// Sector buffers for the "ata test" command (256 words = 512 bytes each)
+static unsigned short ata_out[256];
+static unsigned short ata_in[256];
+
 void start_shell() {
     print_string("\nRisottOS> ", 0x0F);
 
@@ -61,14 +66,14 @@ void start_shell() {
                 buffer[index] = '\0';
                 print_char('\n', 0x0F);
 
-                // COMMAND PROCESSİNG
+                // COMMAND PROCESSING
                 // Basic command parsing using helpers
                 if (buffer[0] == '\0') {
                     // empty line, do nothing
                 } else if (str_eq(buffer, "clear")) {
                     clear_screen();
                 } else if (str_eq(buffer, "help")) {
-                    print_string("Commands:\n  clear - clear screen\n  help  - show help page\n  echo <msg> - print text\n  rtc - show local time and other things\n  sleep - wait for the number of seconds you specified\n", 0x0F);
+                    print_string("Commands:\n  clear - clear screen\n  help  - show help page\n  echo <msg> - print text\n  rtc - show local time and other things\n  sleep - wait for the number of seconds you specified\n  ata test - write and read back a disk sector\n", 0x0F);
                 } else if (str_eq(buffer, "rtc") || str_eq(buffer, "rtc ")) {
                     print_string("Commands:\n  rtc get-time - show full time\n  rtc get-seconds/minutes/hours - show seconds/minutes/hours\n", 0x0F);
                 } else if (starts_with(buffer, "rtc ")) {
@@ -109,7 +114,33 @@ void start_shell() {
                     char *msg = buffer + 5; // skip "echo "
                     print_string(msg, 0x0F);
                     print_char('\n', 0x0F);
-                }  else {
+                } else if (str_eq(buffer, "ata test")) {
+                    unsigned int i;
+                    int ok = 1;
+
+                    for (i = 0; i < 256; i++) {
+                        ata_out[i] = 0xA000 + i;   // every entry is different
+                        ata_in[i] = 0;             // so a failed read can't match by luck
+                    }
+
+                    if (ata_write_sector(2000, ata_out) == -1) {
+                        print_string("ATA write failed\n", 0x0F);
+                    } else if (ata_read_sector(2000, ata_in) == -1) {
+                        print_string("ATA read failed\n", 0x0F);
+                    } else {
+                        for (i = 0; i < 256; i++) {
+                            if (ata_in[i] != ata_out[i]) {
+                                ok = 0;
+                                break;
+                            }
+                        }
+                        if (ok) {
+                            print_string("ATA test OK\n", 0x0F);
+                        } else {
+                            print_string("ATA test FAIL: data mismatch\n", 0x0F);
+                        }
+                    }
+                } else {
                     print_string("Command not found: ", 0x0F);
                     print_string(buffer, 0x0F);
                     print_char('\n', 0x0F);
