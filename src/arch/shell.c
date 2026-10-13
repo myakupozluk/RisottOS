@@ -5,6 +5,7 @@
 #include "../drivers/ata.h"
 #include "io.h"
 #include "../drivers/timer.h"
+#include "../mem/mem.h"
 
 // Simple string equality (no libc)
 static int str_eq(const char *a, const char *b) {
@@ -256,6 +257,29 @@ void start_shell() {
                         print_string("rtc ", 0x0F);
                         print_string(msg, 0x0F);
                         print_string(": Command not found.\n", 0x0F);
+                    }
+                } else if (str_eq(buffer, "mem test")) {
+                    print_string("Allocating 100 bytes...\n", 0x0F);
+                    char *ptr = (char *)r_malloc(100);
+
+                    if (ptr != 0) {
+                        print_string("Malloc OK! Writing data into memory...\n", 0x0F);
+                        ptr[0] = 'R';
+                        ptr[1] = 'i';
+                        ptr[2] = 's';
+                        ptr[3] = 'o';
+                        ptr[4] = 't';
+                        ptr[5] = 't';
+                        ptr[6] = 'o';
+                        ptr[7] = '\0';
+
+                        print_string("Data read from allocated memory: ", 0x0F);
+                        print_string(ptr, 0x0F);
+                        print_string("\nFreeing memory...\n", 0x0F);
+                        r_free(ptr);
+                        print_string("Mem test successfully completed!\n", 0x0F);
+                    } else {
+                        print_string("Malloc FAILED: Out of memory!\n", 0x0F);
                     }
                 } else if (starts_with(buffer, "sleep ")) {
                     char *msg = buffer + 6; // skip "sleep "

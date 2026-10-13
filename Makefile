@@ -18,8 +18,8 @@ CFLAGS := -ffreestanding -fno-pic -fno-stack-protector -O0 -Wall -Wextra -Isrc
 
 BUILD := build
 
-# C sources: kernel, arch and drivers (ata.c is picked up by the wildcard)
-C_SRC   := $(wildcard src/*.c src/arch/*.c src/drivers/*.c)
+# C sources: kernel, arch, drivers, and memory manager components
+C_SRC   := $(wildcard src/*.c src/arch/*.c src/drivers/*.c src/mem/*.c)
 C_OBJ   := $(patsubst src/%.c,$(BUILD)/%.o,$(C_SRC))
 
 # Assembly that is linked into the kernel must be ELF objects (NOT -f bin).
@@ -30,6 +30,11 @@ ASM_OBJ := $(BUILD)/kernel_entry.asm.o $(BUILD)/arch/interrupts.asm.o
 OS_IMG   := os.img
 
 all: $(OS_IMG)
+
+# ---- memory manager build targets ----
+# Explicitly handles compilation and listing of memory objects
+mem: $(C_OBJ)
+	@echo "Memory manager components compiled successfully."
 
 # ---- bootloader ----
 $(BUILD)/boot.bin: $(BOOT_SRC)
@@ -62,4 +67,4 @@ run: all
 clean:
 	rm -rf $(BUILD) $(OS_IMG)
 
-.PHONY: all run clean
+.PHONY: all run clean mem

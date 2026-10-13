@@ -37,12 +37,12 @@ start:
 dap:
     db 0x10
     db 0
-    dw 16
+    dw 18
     dw 0x1000
     dw 0x0000
     dd 1
     dd 0
-    
+
 
 ; ============================================
 ; print - prints a null-terminated string
@@ -91,7 +91,7 @@ gdt_code:                     ; code segment descriptor
     db 0x00                      ; base (bits 16-23)
     db 10011010b                  ; access byte: present, ring 0, code, readable
     db 11001111b                   ; flags (4KB granularity, 32-bit) + limit (16-19)
-    db 0x00                          ; base (bits 24-31)    
+    db 0x00                          ; base (bits 24-31)
 
 gdt_data:                     ; data segment descriptor
     dw 0xFFFF                  ; limit (bits 0-15)
@@ -124,7 +124,7 @@ protected_mode_start:
 
     jmp 0x1000                      ; placeholder, kernel jump comes here later
 
-    
+
 
 ; ============================================
 ; Data

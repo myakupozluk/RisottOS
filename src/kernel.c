@@ -6,6 +6,7 @@
 #include "arch/shell.h"
 #include "drivers/timer.h"
 #include "drivers/ata.h"
+#include "mem/mem.h"
 // Kernel entry point
 void kmain() {
     // Initialize core hardware components
@@ -18,6 +19,8 @@ void kmain() {
     // Boot message and initial prompt
     print_string("RisottOS booted succesfully!\n", 0x0F);
     sleep_ticks(100);
+
+    mem_init((void *)0x100000, 4 * 1024 * 1024);
 
     // The shell owns the input loop.
     start_shell();
