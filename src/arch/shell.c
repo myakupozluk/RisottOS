@@ -16,6 +16,11 @@ static int str_eq(const char *a, const char *b) {
     return *a == *b;
 }
 
+typedef struct {
+    const char *name;
+    void (*handler)(const char *args);
+} ShellCommand;
+
 // Check if str starts with prefix
 static int starts_with(const char *str, const char *prefix) {
     while (*prefix && *str == *prefix) {
@@ -207,12 +212,161 @@ static void cmd_ata_read(const char *args) {
     print_char('\n', 0x0F);
 }
 
+// ---------------------------------------------------------------------------
+// Modular Shell Command Implementation Functions
+// ---------------------------------------------------------------------------
+
+// Handles the 'clear' command
+static void sh_clear(const char *args) {
+    (void)args;
+    clear_screen();
+}
+
+// Handles the 'help' command
+static void sh_help(const char *args) {
+    (void)args;
+    print_string("Commands:\n  clear - clear screen\n  help  - show help page\n  echo <msg> - print text\n  rtc - show local time and other things\n  sleep - wait for the number of seconds you specified\n  ata test - write and read back a disk sector\n  ata write <lba> <text> - write text to a sector\n  ata read <lba> - show a sector as text and hex\n", 0x0F);
+}
+
+// Handles the 'echo' command
+static void sh_echo(const char *args) {
+    print_string(args, 0x0F);
+    print_char('\n', 0x0F);
+}
+
+// Handles the 'rtc' subcommands
+static void sh_rtc(const char *args) {
+    if (args[0] == '\0' || (args[0] == ' ' && args[1] == '\0')) {
+        print_string("Commands:\n  rtc get-time - show full time\n  rtc get-seconds/minutes/hours - show seconds/minutes/hours\n", 0x0F);
+    } else {
+        if (str_eq(args, "help")) {
+            print_string("Commands:\n  rtc get-time - show full time\n  rtc get-seconds/minutes/hours - show seconds/minutes/hours\n", 0x0F);
+        } else if (str_eq(args, "get-time")) {
+            print_string(rtc_get_time(), 0x0F);
+            print_char('\n', 0x0F);
+        } else if (str_eq(args, "get-seconds")) {
+            print_string(rtc_get_seconds(), 0x0F);
+            print_char('\n', 0x0F);
+        } else if (str_eq(args, "get-minutes")) {
+            print_string(rtc_get_minutes(), 0x0F);
+            print_char('\n', 0x0F);
+        } else if (str_eq(args, "get-hours")) {
+            print_string(rtc_get_hours(), 0x0F);
+            print_char('\n', 0x0F);
+        } else {
+            print_string("rtc ", 0x0F);
+            print_string(args, 0x0F);
+            print_string(": Command not found.\n", 0x0F);
+        }
+    }
+}
+
+// Handles the 'mem test' command
+static void sh_mem(const char *args) {
+    if (str_eq(args, "test")) {
+        print_string("Allocating 100 bytes...\n", 0x0F);
+        char *ptr = (char *)r_malloc(100);
+
+        if (ptr != 0) {
+            print_string("Malloc OK! Writing data into memory...\n", 0x0F);
+            ptr[0] = 'R';
+            ptr[1] = 'i';
+            ptr[2] = 's';
+            ptr[3] = 'o';
+            ptr[4] = 't';
+            ptr[5] = 't';
+            ptr[6] = 'o';
+            ptr[7] = '\0';
+
+            print_string("Data read from allocated memory: ", 0x0F);
+            print_string(ptr, 0x0F);
+            print_string("\nFreeing memory...\n", 0x0F);
+            r_free(ptr);
+            print_string("Mem test successfully completed!\n", 0x0F);
+        } else {
+            print_string("Malloc FAILED: Out of memory!\n", 0x0F);
+        }
+    } else {
+        print_string("Usage: mem test\n", 0x0F);
+    }
+}
+
+// Handles the 'sleep' command
+static void sh_sleep(const char *args) {
+    if (str_eq(args, "help")) {
+        print_string("Command:\n  sleep time(1,3,6...) - wait for the number of seconds you specified", 0x0F);
+    } else {
+        int seconds = simple_atoi(args);
+        if (seconds < 0) {
+            print_string("Error: Invalid time format. Use numbers only.\n", 0x0F);
+        } else {
+            sleep_ticks(seconds * 100);
+            print_string("Done sleeping\n", 0x0F);
+        }
+    }
+}
+
+// Handles the multiple 'ata' routing requests
+static void sh_ata(const char *args) {
+    if (starts_with(args, "write")) {
+        cmd_ata_write(args + 5); // skip "write"
+    } else if (starts_with(args, "read")) {
+        cmd_ata_read(args + 4);  // skip "read"
+    } else if (args[0] == '\0' || str_eq(args, "write") || str_eq(args, "read")) {
+        ata_usage();
+    } else if (str_eq(args, "test")) {
+        unsigned int i;
+        int ok = 1;
+
+        for (i = 0; i < 256; i++) {
+            ata_out[i] = 0xA000 + i;   // every entry is different
+            ata_in[i] = 0;             // so a failed read can't match by luck
+        }
+
+        if (ata_write_sector(2000, ata_out) == -1) {
+            print_string("ATA write failed\n", 0x0F);
+        } else if (ata_read_sector(2000, ata_in) == -1) {
+            print_string("ATA read failed\n", 0x0F);
+        } else {
+            for (i = 0; i < 256; i++) {
+                if (ata_in[i] != ata_out[i]) {
+                    ok = 0;
+                    break;
+                }
+            }
+            if (ok) {
+                print_string("ATA test OK\n", 0x0F);
+            } else {
+                print_string("ATA test FAIL: data mismatch\n", 0x0F);
+            }
+        }
+    } else {
+        ata_usage();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shell Command Table Registry Matrix
+// ---------------------------------------------------------------------------
+static const ShellCommand cmd_table[] = {
+    {"clear", sh_clear},
+    {"help",  sh_help},
+    {"echo",  sh_echo},
+    {"rtc",   sh_rtc},
+    {"mem",   sh_mem},
+    {"sleep", sh_sleep},
+    {"ata",   sh_ata}
+};
+
+// Calculate the safe number of items dynamically inside the array loop
+#define CMD_COUNT (sizeof(cmd_table) / sizeof(ShellCommand))
+
 void start_shell() {
     print_string("\nRisottOS> ", 0x0F);
 
     while (1) {
         char c = keyboard_read();
-        
+
         if (c != 0) {
             // Handle backspace key
             if (c == '\b') {
@@ -227,115 +381,40 @@ void start_shell() {
                 buffer[index] = '\0';
                 print_char('\n', 0x0F);
 
-                // COMMAND PROCESSING
-                // Basic command parsing using helpers
+                // COMMAND PROCESSING USING MATRIX REGISTRY TABLE
                 if (buffer[0] == '\0') {
                     // empty line, do nothing
-                } else if (str_eq(buffer, "clear")) {
-                    clear_screen();
-                } else if (str_eq(buffer, "help")) {
-                    print_string("Commands:\n  clear - clear screen\n  help  - show help page\n  echo <msg> - print text\n  rtc - show local time and other things\n  sleep - wait for the number of seconds you specified\n  ata test - write and read back a disk sector\n  ata write <lba> <text> - write text to a sector\n  ata read <lba> - show a sector as text and hex\n", 0x0F);
-                } else if (str_eq(buffer, "rtc") || str_eq(buffer, "rtc ")) {
-                    print_string("Commands:\n  rtc get-time - show full time\n  rtc get-seconds/minutes/hours - show seconds/minutes/hours\n", 0x0F);
-                } else if (starts_with(buffer, "rtc ")) {
-                    char *msg = buffer + 4; // skip "rtc "
-                    if (str_eq(msg, "help")) {
-                        print_string("Commands:\n  rtc get-time - show full time\n  rtc get-seconds/minutes/hours - show seconds/minutes/hours\n", 0x0F);
-                    } else if (str_eq(msg, "get-time")) {
-                        print_string(rtc_get_time(), 0x0F);
-                        print_char('\n', 0x0F);
-                    } else if (str_eq(msg, "get-seconds")) {
-                        print_string(rtc_get_seconds(), 0x0F);
-                        print_char('\n', 0x0F);
-                    } else if (str_eq(msg, "get-minutes")) {
-                        print_string(rtc_get_minutes(), 0x0F);
-                        print_char('\n', 0x0F);
-                    } else if (str_eq(msg, "get-hours")) {
-                        print_string(rtc_get_hours(), 0x0F);
-                        print_char('\n', 0x0F);
-                    } else {
-                        print_string("rtc ", 0x0F);
-                        print_string(msg, 0x0F);
-                        print_string(": Command not found.\n", 0x0F);
-                    }
-                } else if (str_eq(buffer, "mem test")) {
-                    print_string("Allocating 100 bytes...\n", 0x0F);
-                    char *ptr = (char *)r_malloc(100);
-
-                    if (ptr != 0) {
-                        print_string("Malloc OK! Writing data into memory...\n", 0x0F);
-                        ptr[0] = 'R';
-                        ptr[1] = 'i';
-                        ptr[2] = 's';
-                        ptr[3] = 'o';
-                        ptr[4] = 't';
-                        ptr[5] = 't';
-                        ptr[6] = 'o';
-                        ptr[7] = '\0';
-
-                        print_string("Data read from allocated memory: ", 0x0F);
-                        print_string(ptr, 0x0F);
-                        print_string("\nFreeing memory...\n", 0x0F);
-                        r_free(ptr);
-                        print_string("Mem test successfully completed!\n", 0x0F);
-                    } else {
-                        print_string("Malloc FAILED: Out of memory!\n", 0x0F);
-                    }
-                } else if (starts_with(buffer, "sleep ")) {
-                    char *msg = buffer + 6; // skip "sleep "
-                    if (str_eq(msg, "help")) {
-                        print_string("Command:\n  sleep time(1,3,6...) - wait for the number of seconds you specified", 0x0F);
-                    } else {
-                        int seconds = simple_atoi(msg);
-                        if (seconds < 0) {
-                            print_string("Error: Invalid time format. Use numbers only.\n", 0x0F);
-                        } else {
-                            sleep_ticks(seconds * 100);
-                            print_string("Done sleeping\n", 0x0F);
-                        }
-                    }
-                } else if (starts_with(buffer, "echo ")) {
-                    char *msg = buffer + 5; // skip "echo "
-                    print_string(msg, 0x0F);
-                    print_char('\n', 0x0F);
-                } else if (starts_with(buffer, "ata write ")) {
-                    cmd_ata_write(buffer + 10);   // skip "ata write "
-                } else if (starts_with(buffer, "ata read ")) {
-                    cmd_ata_read(buffer + 9);     // skip "ata read "
-                } else if (str_eq(buffer, "ata") || str_eq(buffer, "ata write") || str_eq(buffer, "ata read")) {
-                    ata_usage();
-                } else if (str_eq(buffer, "ata test")) {
-                    unsigned int i;
-                    int ok = 1;
-
-                    for (i = 0; i < 256; i++) {
-                        ata_out[i] = 0xA000 + i;   // every entry is different
-                        ata_in[i] = 0;             // so a failed read can't match by luck
-                    }
-
-                    if (ata_write_sector(2000, ata_out) == -1) {
-                        print_string("ATA write failed\n", 0x0F);
-                    } else if (ata_read_sector(2000, ata_in) == -1) {
-                        print_string("ATA read failed\n", 0x0F);
-                    } else {
-                        for (i = 0; i < 256; i++) {
-                            if (ata_in[i] != ata_out[i]) {
-                                ok = 0;
-                                break;
-                            }
-                        }
-                        if (ok) {
-                            print_string("ATA test OK\n", 0x0F);
-                        } else {
-                            print_string("ATA test FAIL: data mismatch\n", 0x0F);
-                        }
-                    }
                 } else {
-                    print_string("Command not found: ", 0x0F);
-                    print_string(buffer, 0x0F);
-                    print_char('\n', 0x0F);
+                    unsigned int i;
+                    int cmd_executed = 0;
+
+                    // Iterate through the structured array lookup table
+                    for (i = 0; i < CMD_COUNT; i++) {
+                        unsigned int cmd_len = 0;
+                        while (cmd_table[i].name[cmd_len] != '\0') {
+                            cmd_len++;
+                        }
+
+                        // Match full direct matching string keywords or spaced inputs
+                        if (str_eq(buffer, cmd_table[i].name)) {
+                            cmd_table[i].handler(""); // Call function with empty arguments
+                            cmd_executed = 1;
+                            break;
+                        }
+                        else if (starts_with(buffer, cmd_table[i].name) && buffer[cmd_len] == ' ') {
+                            cmd_table[i].handler(buffer + cmd_len + 1); // Pass sanitized tail parameters
+                            cmd_executed = 1;
+                            break;
+                        }
+                    }
+
+                    if (!cmd_executed) {
+                        print_string("Command not found: ", 0x0F);
+                        print_string(buffer, 0x0F);
+                        print_char('\n', 0x0F);
+                    }
                 }
-                
+
                 index = 0;
                 print_string("RisottOS> ", 0x0F);
             }
