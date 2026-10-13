@@ -162,7 +162,6 @@ static void cmd_ata_write(const char *args) {
 static void cmd_ata_read(const char *args) {
     unsigned int lba;
     unsigned int i;
-    unsigned char *bytes = (unsigned char *)ata_in;
 
     if (parse_uint(&args, &lba) != 0) {
         ata_usage();
@@ -180,9 +179,18 @@ static void cmd_ata_read(const char *args) {
         return;
     }
 
+    unsigned short *my_buffer = (unsigned short *)r_malloc(512);
+    if (my_buffer == 0) {
+        print_string("Out of memory!\n", 0x0F);
+        return;
+    }
+    unsigned char *bytes = (unsigned char *)my_buffer;
+
+
     for (i = 0; i < 512; i++) bytes[i] = 0;   // so a failed read can't show stale data
-    if (ata_read_sector(lba, ata_in) == -1) {
+    if (ata_read_sector(lba, my_buffer) == -1) {
         print_string("ATA read failed\n", 0x0F);
+        r_free(my_buffer);
         return;
     }
 
@@ -210,6 +218,7 @@ static void cmd_ata_read(const char *args) {
         print_char(' ', 0x0F);
     }
     print_char('\n', 0x0F);
+    r_free(my_buffer);
 }
 
 // ---------------------------------------------------------------------------
