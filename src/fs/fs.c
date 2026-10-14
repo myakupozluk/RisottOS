@@ -42,7 +42,7 @@ static void print_uint(unsigned int n) {
 
 void fs_list_files(void) {
     unsigned int current_lba = 100;
-    unsigned short sector_buffer[216];
+    unsigned short sector_buffer[256];
 
     print_string("Listing files on RFS\n", 0x07);
 
