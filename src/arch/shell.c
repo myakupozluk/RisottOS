@@ -6,6 +6,7 @@
 #include "io.h"
 #include "../drivers/timer.h"
 #include "../mem/mem.h"
+#include "../rfs/rfs.h"
 
 // Simple string equality (no libc)
 static int str_eq(const char *a, const char *b) {
@@ -57,10 +58,10 @@ static unsigned short ata_in[256];
 // ---------------------------------------------------------------------------
 
 // Sectors below this hold the boot sector and the kernel image, so "ata write"
-// refuses them. Raise it if the kernel grows past 100 sectors (50 KB).
-#define ATA_WRITE_MIN_LBA 100u
-// os.img is padded to 1.44 MB = 2880 sectors, so the last valid LBA is 2879.
-#define ATA_MAX_LBA       2879u
+// refuses them. Raise it if the kernel grows past 101 sectors (50.5 KB).
+#define ATA_WRITE_MIN_LBA 150u
+// os.img is padded to 64 MB = 131072 sectors, so the last valid LBA is 131071.
+#define ATA_MAX_LBA       131071u
 
 static void print_uint(unsigned int n) {
     char tmp[11];
@@ -112,11 +113,16 @@ static int parse_uint(const char **s, unsigned int *out) {
 
 static void ata_usage(void) {
     print_string("Usage:\n"
-                 "  ata write <lba> <text> - write text to a sector (LBA 100-2879)\n"
-                 "  ata read <lba>         - show a sector as text and hex (LBA 0-2879)\n"
+                 "  ata write <lba> <text> - write text to a sector (LBA 150-131071)\n"
+                 "  ata read <lba>         - show a sector as text and hex (LBA 0-131071)\n"
                  "  ata test               - automatic write/read-back check\n", 0x0F);
 }
-
+static void cmd_ata_disc_space(void){
+    float disc_space = ata_disc_space();
+    print_string("Disc Space:", 0x0F);
+    print_uint(disc_space/2048);
+    print_string("MBs\n", 0x0F);
+}
 // ata write <lba> <text>
 static void cmd_ata_write(const char *args) {
     unsigned int lba;
@@ -234,7 +240,7 @@ static void sh_clear(const char *args) {
 // Handles the 'help' command
 static void sh_help(const char *args) {
     (void)args;
-    print_string("Commands:\n  clear - clear screen\n  help  - show help page\n  echo <msg> - print text\n  rtc - show local time and other things\n  sleep - wait for the number of seconds you specified\n  ata test - write and read back a disk sector\n  ata write <lba> <text> - write text to a sector\n  ata read <lba> - show a sector as text and hex\n", 0x0F);
+    print_string("Commands:\n  clear - clear screen\n  help  - show help page\n  echo <msg> - print text\n  rtc - show local time and other things\n  sleep - wait for the number of seconds you specified\n  ata test - write and read back a disk sector\n  ata write <lba> <text> - write text to a sector\n  ata read <lba> - show a sector as text and hex\n  rfs info - show filesystem info\n  rfs init - validate filesystem\n  rfs format - format filesystem (destructive)\n", 0x0F);
 }
 
 // Handles the 'echo' command
@@ -349,8 +355,41 @@ static void sh_ata(const char *args) {
                 print_string("ATA test FAIL: data mismatch\n", 0x0F);
             }
         }
+    } else if(str_eq(args, "avail")){
+        cmd_ata_disc_space();
     } else {
         ata_usage();
+    }
+}
+
+
+// Handles the 'rfs' filesystem commands.
+static void sh_rfs(const char *args) {
+    while (*args == ' ') args++;
+
+    if (str_eq(args, "info")) {
+        if (rfs_info() != 0) {
+            print_string("RFS info failed. Is the filesystem formatted?\n", 0x0F);
+        }
+    } else if (str_eq(args, "init")) {
+        if (rfs_init() == 0) {
+            print_string("RFS initialized successfully.\n", 0x0F);
+        } else {
+            print_string("RFS init failed: invalid or unformatted filesystem.\n", 0x0F);
+        }
+    } else if (str_eq(args, "format")) {
+        print_string("WARNING: rfs format erases existing RFS metadata!\n", 0x0F);
+        print_string("Run this only when you intentionally want to format the filesystem.\n", 0x0F);
+        if (rfs_format() == 0) {
+            print_string("RFS formatted successfully.\n", 0x0F);
+        } else {
+            print_string("RFS format failed.\n", 0x0F);
+        }
+    } else {
+        print_string("RFS commands:\n"
+                     "  rfs info   - show filesystem information\n"
+                     "  rfs init   - validate the filesystem\n"
+                     "  rfs format - create/reset filesystem metadata (destructive)\n", 0x0F);
     }
 }
 
@@ -364,7 +403,8 @@ static const ShellCommand cmd_table[] = {
     {"rtc",   sh_rtc},
     {"mem",   sh_mem},
     {"sleep", sh_sleep},
-    {"ata",   sh_ata}
+    {"ata",   sh_ata},
+    {"rfs",   sh_rfs}
 };
 
 // Calculate the safe number of items dynamically inside the array loop

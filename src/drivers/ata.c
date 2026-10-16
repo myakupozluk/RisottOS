@@ -138,3 +138,47 @@ int ata_read_sector(unsigned int lba, unsigned short *buffer){
     ata_read_words(ATA_DATA, buffer, 256);
     return 0;
 }
+
+// Returns the total number of 512-byte sectors on the master drive,
+// or 0 if there is no ATA drive / the command failed.
+unsigned int ata_disc_space(void){
+    static unsigned short identify[256];
+
+    if(ata_wait_ready() == -1){
+        return 0;
+    }
+
+    outb(ATA_DRIVE_SELECT, 0xA0);   // master, IDENTIFY does not use LBA mode
+    ata_delay();
+
+    outb(ATA_SECTOR_COUNT, 0);
+    outb(ATA_LBA_LOW, 0);
+    outb(ATA_LBA_MED, 0);
+    outb(ATA_LBA_HIGH, 0);
+
+    outb(ATA_COMMAND, ATA_IDENTIFY);
+    ata_delay();
+
+    // status 0 means there is no drive on this channel
+    if(inb(ATA_COMMAND) == 0){
+        return 0;
+    }
+
+    if(ata_wait_ready() == -1){
+        return 0;
+    }
+
+    // non-zero here means it is not a plain ATA drive (ATAPI/SATA)
+    if(inb(ATA_LBA_MED) != 0 || inb(ATA_LBA_HIGH) != 0){
+        return 0;
+    }
+
+    if(ata_wait_drq() == -1){
+        return 0;
+    }
+
+    ata_read_words(ATA_DATA, identify, 256);
+
+    // words 60 (low) and 61 (high) = total user-addressable sectors
+    return ((unsigned int)identify[61] << 16) | identify[60];
+}

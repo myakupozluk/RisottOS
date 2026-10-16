@@ -37,7 +37,7 @@ start:
 dap:
     db 0x10
     db 0
-    dw 18
+    dw 30
     dw 0x1000
     dw 0x0000
     dd 1

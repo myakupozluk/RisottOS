@@ -36,6 +36,6 @@ void ata_irq_handler(void);
 void ata_init(void);
 int ata_read_sector(unsigned int lba, unsigned short *buffer);
 int ata_write_sector(unsigned int lba, const unsigned short *buffer);
-
+unsigned int ata_disc_space(void);
 
 #endif
