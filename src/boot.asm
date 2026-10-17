@@ -3,13 +3,31 @@
 ; Loaded by BIOS at 0x7C00, runs in 16-bit real mode
 ; ============================================
 
-[org 0x7C00]
+; The BIOS loads us at 0x7C00, but the kernel is loaded at 0x1000 and is
+; bigger than 0x6C00 bytes (54 sectors), so it would overwrite this very
+; code (and the real-mode stack) while being read. So the first thing we do
+; is copy this sector down to 0x0600 and keep running from there.
+; The whole file is assembled for 0x0600; the first few instructions below
+; only use absolute immediates, so they work while still sitting at 0x7C00.
+[org 0x0600]
 bits 16
 
 start:
+    cli
     xor ax, ax
     mov ds, ax
     mov es, ax
+    mov ss, ax
+    mov sp, 0x0600          ; stack grows down below the relocated code
+    sti
+    mov si, 0x7C00          ; source: where the BIOS put us
+    mov di, 0x0600          ; destination
+    mov cx, 256             ; 256 words = 512 bytes
+    cld
+    rep movsw
+    jmp 0x0000:relocated    ; continue in the copy (dl is still the boot drive)
+
+relocated:
 
     mov [bootdisk], dl
 
@@ -37,7 +55,7 @@ start:
 dap:
     db 0x10
     db 0
-    dw 30
+    dw 99                   ; sectors 1..99 (the RFS filesystem starts at LBA 100)
     dw 0x1000
     dw 0x0000
     dd 1
